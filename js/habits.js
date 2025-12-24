@@ -2,14 +2,16 @@ import { db } from "./firebase.js";
 import {
   collection,
   addDoc,
-  query,
-  orderBy,
-  onSnapshot,
   doc,
   getDoc,
+  getDocs,       // ✅ ADD THIS
+  onSnapshot,
   runTransaction,
-  serverTimestamp
+  serverTimestamp,
+  query,
+  orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
 
 /* HELPERS */
 
