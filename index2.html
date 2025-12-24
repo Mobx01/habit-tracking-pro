@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Habit Tracker Pro</title>
+
+<!-- 🔗 External CSS -->
+<link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+
+<h1>🔥 Habit Tracker Pro</h1>
+
+<button id="loginBtn">Login with Google</button>
+<button id="logoutBtn" style="display:none;">Logout</button>
+
+<hr>
+
+<input id="habitInput" placeholder="Enter habit name">
+<button id="addHabitBtn">Add Habit</button>
+
+<ul id="habitList"></ul>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } 
+    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  import { getFirestore, collection, addDoc, doc, getDoc, getDocs, updateDoc, query, orderBy } 
+    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBiUIVQ56dsKRKCy4EjH-dbXafgB0B24VQ",
+    authDomain: "habit-tracker-pro-d8ed4.firebaseapp.com",
+    projectId: "habit-tracker-pro-d8ed4",
+    storageBucket: "habit-tracker-pro-d8ed4.firebasestorage.app",
+    messagingSenderId: "553812934904",
+    appId: "1:553812934904:web:670994364e8907845f7b0d",
+    measurementId: "G-MBJSMVRD3G"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+
+  const loginBtn = document.getElementById("loginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const addHabitBtn = document.getElementById("addHabitBtn");
+  const habitInput = document.getElementById("habitInput");
+  const habitList = document.getElementById("habitList");
+
+  function getBadge(streak) {
+    if (streak >= 100) return "👑 Legend";
+    if (streak >= 30) return "🥇 Gold";
+    if (streak >= 7) return "🥈 Silver";
+    if (streak >= 3) return "🥉 Bronze";
+    return "None";
+  }
+
+  loginBtn.onclick = async () => {
+    await signInWithPopup(auth, provider);
+  };
+
+  logoutBtn.onclick = async () => {
+    await signOut(auth);
+    habitList.innerHTML = "";
+  };
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      loginBtn.style.display = "none";
+      logoutBtn.style.display = "inline";
+      loadHabits(user.uid);
+    } else {
+      loginBtn.style.display = "inline";
+      logoutBtn.style.display = "none";
+    }
+  });
+
+  addHabitBtn.onclick = async () => {
+    const user = auth.currentUser;
+    if (!user || !habitInput.value) return;
+
+    await addDoc(collection(db, "users", user.uid, "habits"), {
+      name: habitInput.value,
+      streak: 0,
+      badge: "None",
+      lastCompleted: null,
+      createdAt: new Date()
+    });
+
+    habitInput.value = "";
+    loadHabits(user.uid);
+  };
+
+  async function loadHabits(uid) {
+    habitList.innerHTML = "";
+    const q = query(collection(db, "users", uid, "habits"), orderBy("createdAt"));
+    const snap = await getDocs(q);
+
+    snap.forEach(docSnap => {
+      const data = docSnap.data();
+      const li = document.createElement("li");
+
+      li.innerHTML = `
+        <strong>${data.name}</strong><br>
+        🔥 Streak: ${data.streak} days<br>
+        🏆 Badge: <b>${data.badge}</b><br><br>
+        <button onclick="markDone('${docSnap.id}')">Mark Done</button>
+      `;
+
+      habitList.appendChild(li);
+    });
+  }
+
+  window.markDone = async function (habitId) {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const ref = doc(db, "users", user.uid, "habits", habitId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+
+    const data = snap.data();
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+
+    if (data.lastCompleted === today) {
+      alert("Already completed today 🔥");
+      return;
+    }
+
+    let newStreak = data.lastCompleted === yesterday ? data.streak + 1 : 1;
+    const newBadge = getBadge(newStreak);
+
+    await updateDoc(ref, {
+      streak: newStreak,
+      badge: newBadge,
+      lastCompleted: today
+    });
+
+    if (newBadge !== data.badge) {
+      alert(`🎉 Badge Unlocked: ${newBadge}`);
+    }
+
+    loadHabits(user.uid);
+  };
+</script>
+
+</body>
+</html>
+
